@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>產品訂購系統 - 修正版</title>
+    <style>
+        :root { --primary: #2c3e50; --secondary: #27ae60; --accent: #e67e22; }
+        body { font-family: "Microsoft JhengHei", sans-serif; background: #f4f7f6; padding: 15px; }
+        .container { max-width: 1150px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: var(--primary); border-bottom: 3px solid var(--secondary); padding-bottom: 10px; }
+        .setup-row { display: flex; justify-content: space-between; align-items: center; background: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .discount-label { font-size: 1.1rem; font-weight: bold; color: var(--primary); }
+        select { padding: 10px 15px; font-size: 16px; border: 2px solid var(--secondary); border-radius: 5px; cursor: pointer; background: white; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { background: var(--primary); color: white; padding: 12px 5px; font-size: 14px; position: sticky; top: 0; }
+        td { border: 1px solid #ddd; padding: 8px 5px; text-align: center; }
+        .sku-input, .price-input { width: 90%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; text-align: center; }
+        .price-input { background-color: #fffdf0; border: 1px solid var(--accent); color: #d35400; }
+        .qty-input { width: 60px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; text-align: center; }
+        .name-cell { text-align: left; padding-left: 10px; font-size: 13px; color: #444; }
+        .total-section { margin-top: 25px; display: flex; gap: 20px; }
+        .card { flex: 1; padding: 20px; border-radius: 10px; color: white; text-align: center; }
+        .card-money { background: var(--secondary); }
+        .card-pv { background: #2980b9; }
+        .card-label { font-size: 1.1rem; margin-bottom: 8px; }
+        .card-value { font-size: 2.2rem; font-weight: bold; }
+        .btn-clear { background: #e74c3c; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; float: right; margin-top: 15px; font-weight: bold; }
+        tr:nth-child(even) { background-color: #fcfcfc; }
+        .highlight { color: var(--accent); font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>📋 產品訂購系統 (已修正語法錯誤)</h2>
+
+    <div class="setup-row">
+        <div class="discount-label">
+            📍 批量帶入折扣價：
+            <select id="discount-tier" onchange="updateAllPricesByTier()">
+                <option value="suggested">建議零售價 (原價)</option>
+                <option value="p25">25% 折扣價</option>
+                <option value="p35">35% 折扣價</option>
+                <option value="p42">42% 折扣價</option>
+                <option value="p50" selected>50% 折扣價</option>
+            </select>
+        </div>
+        <div style="font-size: 13px; color: #e67e22;">💡 橘色欄位為「單價」，輸入貨號後會自動帶入，也可手動修改。</div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th width="4%">#</th>
+                <th width="12%">貨號</th>
+                <th width="32%">產品名稱</th>
+                <th width="12%">單價 (可改)</th>
+                <th width="10%">單品 PV</th>
+                <th width="8%">數量</th>
+                <th width="11%">金額小計</th>
+                <th width="11%">點數小計</th>
+            </tr>
+        </thead>
+        <tbody id="main-table"></tbody>
+    </table>
+
+    <div class="total-section">
+        <div class="card card-money">
+            <div class="card-label">💰 應付總金額</div>
+            <div class="card-value">$ <span id="final-money">0</span></div>
+        </div>
+        <div class="card card-pv">
+            <div class="card-label">📊 總計點數</div>
+            <div class="card-value"><span id="final-pv">0</span> PV</div>
+        </div>
+    </div>
+
+    <button class="btn-clear" onclick="resetForm()">🔄 清空表格</button>
+</div>
+
+<script>
+// 產品資料庫 - 已修正大括號錯誤
+const productDB = {
+    "388K": { name: "營養蛋白混合飲料-香草(藍鵲版)", pv: 22.40, prices: { suggested: 1850, p25: 1424, p35: 1253, p42: 1134, p50: 998 } },
+    "2770": { name: "營養蛋白混合飲料-香草", pv: 22.40, prices: { suggested: 1850, p25: 1424, p35: 1253, p42: 1134, p50: 998 } },
+    "389K": { name: "營養蛋白混合飲料-巧克力(黑熊版)", pv: 22.40, prices: { suggested: 1850, p25: 1424, p35: 1253, p42: 1134, p50: 998 } },
+    "2771": { name: "營養蛋白混合飲料-巧克力", pv: 22.40, prices: { suggested: 1850, p25: 1424, p35: 1253, p42: 1134, p50: 998 } },
+    "390K": { name: "營養蛋白混合飲料-草莓(阿里山限定版)", pv: 22.40, prices: { suggested: 1850, p25: 1424, p35: 1253, p42: 1134, p50: 998 } },
+    "2772": { name: "營養蛋白混合飲料-草莓", pv: 22.40, prices: { suggested: 1850, p25: 1424, p35: 1253, p42: 1134, p50: 998 } },
+    "1207": { name: "營養蛋白混合飲料-薄菏巧克力", pv: 22.40, prices: { suggested: 1850, p25: 1424, p35: 1253, p42: 1134, p50: 998 } },
+    "2487": { name: "營養蛋白混合飲料-拿鐵", pv: 22.40, prices: { suggested: 1850, p25: 1424, p35: 1253, p42: 1134, p50: 998 } },
+    "0271": { name: "營養蛋白混合飲料-巧餅", pv: 22.40, prices: { suggested: 1850, p25: 1424, p35: 1253, p42: 1134, p50: 998 } },
+    "392K": { name: "營養蛋白混合飲料-芒果(平溪天燈節限定版)", pv: 22.40, prices: { suggested: 1850, p25: 1424, p35: 1253, p42: 1134, p50: 998 } },
+    "2335": { name: "營養蛋白混合飲料-芒果", pv: 22.40, prices: { suggested: 1850, p25: 1424, p35: 1253, p42: 1134, p50: 998 } },
+    "072K": { name: "營養蛋白混合飲料-精選植物配方", pv: 23.30, prices: { suggested: 2167, p25: 1667, p35: 1468, p42: 1328, p50: 1169 } },
+    "0367": { name: "兒童營養蛋白混合飲料-香草(效期較短)", pv: 19.95, prices: { suggested: 1594, p25: 1226, p35: 1079, p42: 977, p50: 859 } },
+    "0242": { name: "優質蛋白粉", pv: 17.95, prices: { suggested: 1433, p25: 1103, p35: 970, p42: 878, p50: 773 } },
+    "217K": { name: "特級優質蛋白粉", pv: 28.90, prices: { suggested: 2511, p25: 1956, p35: 1734, p42: 1579, p50: 1402 } },
+    "247K": { name: "特級優質蛋白粉-精選植物配方", pv: 28.90, prices: { suggested: 2804, p25: 2249, p35: 2027, p42: 1872, p50: 1695 } },
+    "3122": { name: "草維錠", pv: 10.00, prices: { suggested: 605, p25: 465, p35: 410, p42: 371, p50: 327 } },
+    "3272": { name: "蔬果營養錠 Garden 7", pv: 39.95, prices: { suggested: 2669, p25: 2054, p35: 1808, p42: 1636, p50: 1439 } },
+    "1463": { name: "CR7勁能飲 CR7 Drive", pv: 24.90, prices: { suggested: 1811, p25: 1422, p35: 1266, p42: 1157, p50: 1032 } },
+    "1457": { name: "H24 運動營養飲-香草口味 H24", pv: 41.60, prices: { suggested: 3085, p25: 2374, p35: 2090, p42: 1890, p50: 1663 } },
+    "1459": { name: "H24賦活能量飲 H24", pv: 54.75, prices: { suggested: 3857, p25: 2967, p35: 2612, p42: 2363, p50: 2079 } },
+    "0260": { name: "活力點心棒-檸檬", pv: 7.70, prices: { suggested: 773, p25: 666, p35: 623, p42: 593, p50: 559 } },
+    "1502": { name: "紫錐花強健飲-蜂蜜香橙", pv: 9.95, prices: { suggested: 752, p25: 579, p35: 509, p42: 461, p50: 405 } },
+    "0022": { name: "五味子活力錠", pv: 15.50, prices: { suggested: 1139, p25: 877, p35: 772, p42: 698, p50: 614 } },
+    "3151": { name: "Liftoff 活力發泡錠-橘子", pv: 15.95, prices: { suggested: 1031, p25: 794, p35: 698, p42: 631, p50: 555 } },
+    "3152": { name: "Liftoff 活力發泡錠-檸檬蘭姆", pv: 15.95, prices: { suggested: 1031, p25: 794, p35: 698, p42: 631, p50: 555 } },
+    "044K": { name: "舒活飲", pv: 37.65, prices: { suggested: 2269, p25: 1746, p35: 1536, p42: 1390, p50: 1223 } },
+    "0106": { name: "草本濃縮速溶茶飲-原味(102克)", pv: 34.95, prices: { suggested: 2140, p25: 1646, p35: 1449, p42: 1311, p50: 1154 } },
+    "2121": { name: "草本濃縮速溶茶飲-蜜薑(102克)", pv: 34.95, prices: { suggested: 2140, p25: 1646, p35: 1449, p42: 1311, p50: 1154 } },
+    "0256": { name: "草本濃縮速溶茶飲-覆盆子(50克)", pv: 19.95, prices: { suggested: 1248, p25: 961, p35: 845, p42: 765, p50: 673 } },
+    "0102": { name: "瓜拿那豆速溶茶飲(60克)", pv: 14.75, prices: { suggested: 1024, p25: 788, p35: 693, p42: 627, p50: 552 } },
+    "1427": { name: "綠茶飲-原味", pv: 28.25, prices: { suggested: 1726, p25: 1328, p35: 1169, p42: 1057, p50: 930 } },
+    "1428": { name: "綠茶飲-石榴口味", pv: 28.25, prices: { suggested: 1726, p25: 1328, p35: 1169, p42: 1057, p50: 930 } },
+    "0210": { name: "甲殼纖維素", pv: 24.05, prices: { suggested: 1680, p25: 1293, p35: 1138, p42: 1030, p50: 906 } },
+    "0111": { name: "細喜錠", pv: 15.75, prices: { suggested: 810, p25: 623, p35: 548, p42: 496, p50: 437 } },
+    "0049": { name: "享孅錠", pv: 34.20, prices: { suggested: 2471, p25: 1902, p35: 1674, p42: 1514, p50: 1331 } },
+    "2864": { name: "營養纖維粉-蘋果口味", pv: 22.95, prices: { suggested: 1761, p25: 1356, p35: 1193, p42: 1079, p50: 949 } },
+    "2865": { name: "營養纖維粉-原味", pv: 22.95, prices: { suggested: 1761, p25: 1356, p35: 1193, p42: 1079, p50: 949 } },
+    "0006": { name: "濃縮蘆薈汁-原味", pv: 24.95, prices: { suggested: 1904, p25: 1465, p35: 1289, p42: 1167, p50: 1026 } },
+    "1065": { name: "濃縮蘆薈汁-芒果口味", pv: 24.95, prices: { suggested: 1904, p25: 1465, p35: 1289, p42: 1167, p50: 1026 } },
+    "1610": { name: "濃縮蘆薈汁-葡萄口味", pv: 24.95, prices: { suggested: 1904, p25: 1465, p35: 1289, p42: 1167, p50: 1026 } },
+    "1829": { name: "賀寶芙益生菌", pv: 20.45, prices: { suggested: 1511, p25: 1162, p35: 1024, p42: 926, p50: 815 } },
+    "0036": { name: "夜寧新", pv: 89.95, prices: { suggested: 6001, p25: 4618, p35: 4065, p42: 3677, p50: 3234 } },
+    "0065": { name: "深海魚油膠囊", pv: 25.75, prices: { suggested: 1948, p25: 1499, p35: 1320, p42: 1194, p50: 1050 } },
+    "0100": { name: "南極磷蝦油膠囊", pv: 35.50, prices: { suggested: 2473, p25: 1903, p35: 1675, p42: 1515, p50: 1332 } },
+    "0565": { name: "複合優質鈣片", pv: 10.70, prices: { suggested: 812, p25: 625, p35: 549, p42: 498, p50: 438 } },
+    "1000": { name: "關捷寶營養錠", pv: 44.00, prices: { suggested: 3314, p25: 2550, p35: 2245, p42: 2031, p50: 1786 } },
+    "0056": { name: "膠原蛋白美妍飲", pv: 43.55, prices: { suggested: 3168, p25: 2438, p35: 2145, p42: 1941, p50: 1707 } },
+    "0566": { name: "當歸錠", pv: 13.30, prices: { suggested: 940, p25: 723, p35: 636, p42: 576, p50: 507 } },
+    "0279": { name: "複合莓菁華膠囊", pv: 13.95, prices: { suggested: 1099, p25: 846, p35: 744, p42: 674, p50: 593 } },
+    "194K": { name: "舒視錠", pv: 38.75, prices: { suggested: 2672, p25: 2056, p35: 1810, p42: 1637, p50: 1441 } },
+    "145K": { name: "優護飲", pv: 10.75, prices: { suggested: 858, p25: 660, p35: 581, p42: 526, p50: 463 } },
+    "75Z8": { name: "優質營養早餐組", pv: 63.30, prices: { suggested: 5044, p25: 3882, p35: 3417, p42: 3090, p50: 2718 } },
+    "75Z9": { name: "活力營養早餐組", pv: 62.10, prices: { suggested: 4778, p25: 3676, p35: 3235, p42: 2927, p50: 2575 } },
+    "76Z0": { name: "促進代謝早餐組", pv: 82.30, prices: { suggested: 5894, p25: 4535, p35: 3991, p42: 3611, p50: 3176 } },
+    "76Z1": { name: "體重管理組", pv: 83.10, prices: { suggested: 5404, p25: 4159, p35: 3660, p42: 3312, p50: 2913 } },
+    "76Z8": { name: "青春活力組-靈活", pv: 54.70, prices: { suggested: 4125, p25: 3174, p35: 2794, p42: 2527, p50: 2224 } },
+    "76Z9": { name: "青春活力組-消化", pv: 68.35, prices: { suggested: 5175, p25: 3983, p35: 3505, p42: 3171, p50: 2790 } },
+    "77Z0": { name: "青春活力組-美麗升級", pv: 90.80, prices: { suggested: 6680, p25: 5141, p35: 4524, p42: 4093, p50: 3600 } },
+    "77Z1": { name: "美食三法寶組", pv: 74.00, prices: { suggested: 4960, p25: 3817, p35: 3359, p42: 3039, p50: 2673 } },
+    "77Z2": { name: "青春活力組-清晰", pv: 92.65, prices: { suggested: 6441, p25: 4956, p35: 4362, p42: 3946, p50: 3471 } },
+    "77Z3": { name: "青春活力組-360度循環通暢", pv: 171.40, prices: { suggested: 12082, p25: 9316, p35: 8208, p42: 7433, p50: 6548 } },
+    "77Z4": { name: "青春活力組-倍他循環", pv: 110.15, prices: { suggested: 7662, p25: 5914, p35: 5214, p42: 4725, p50: 4165 } },
+    "011K": { name: "金質冰咖啡-摩卡", pv: 25.75, prices: { suggested: 1851, p25: 1425, p35: 1254, p42: 1134, p50: 998 } },
+    "012K": { name: "金質冰咖啡-拿鐵", pv: 25.75, prices: { suggested: 1851, p25: 1425, p35: 1254, p42: 1134, p50: 998 } },
+    "0267": { name: "倍他營養燕麥飲", pv: 20.20, prices: { suggested: 1661, p25: 1297, p35: 1151, p42: 1048, p50: 931 } },
+    "127K": { name: "女士之選(大豆異黃酮錠)", pv: 20.00, prices: { suggested: 1473, p25: 1134, p35: 998, p42: 903, p50: 794 } },
+    "291K": { name: "益知新", pv: 53.60, prices: { suggested: 3274, p25: 2519, p35: 2218, p42: 2007, p50: 1765 } },
+    "0765": { name: "SKIN 舒顏潔膚凝膠", pv: 16.75, prices: { suggested: 981, p25: 755, p35: 665, p42: 601, p50: 529 } },
+    "0766": { name: "SKIN 煥顏潔膚凝膠", pv: 16.75, prices: { suggested: 981, p25: 755, p35: 665, p42: 601, p50: 529 } },
+    "0767": { name: "SKIN 草本化妝水 50ml", pv: 12.70, prices: { suggested: 743, p25: 572, p35: 503, p42: 456, p50: 401 } },
+    "0891": { name: "SKIN 草本化妝水 150ml", pv: 32.30, prices: { suggested: 1863, p25: 1433, p35: 1261, p42: 1141, p50: 1004 } },
+    "0768": { name: "SKIN 防皺極緻精華霜", pv: 37.70, prices: { suggested: 2205, p25: 1697, p35: 1493, p42: 1351, p50: 1189 } },
+    "0770": { name: "SKIN 緊緻眼膠", pv: 26.35, prices: { suggested: 1542, p25: 1187, p35: 1045, p42: 945, p50: 832 } },
+    "0771": { name: "SKIN 保濕眼霜", pv: 26.35, prices: { suggested: 1542, p25: 1187, p35: 1045, p42: 945, p50: 832 } },
+    "0772": { name: "SKIN 瞬采磨砂膏", pv: 13.10, prices: { suggested: 768, p25: 591, p35: 520, p42: 470, p50: 414 } },
+    "0773": { name: "SKIN 深層淨化面膜", pv: 14.20, prices: { suggested: 831, p25: 639, p35: 563, p42: 509, p50: 448 } },
+    "0769": { name: "SKIN 煥顏日間乳液", pv: 28.40, prices: { suggested: 1661, p25: 1278, p35: 1125, p42: 1017, p50: 896 } },
+    "0774": { name: "SKIN 賦活晚霜", pv: 28.40, prices: { suggested: 1661, p25: 1278, p35: 1125, p42: 1017, p50: 896 } },
+    "0899": { name: "SKIN 防曬乳液SPF30/PA+++", pv: 28.40, prices: { suggested: 1661, p25: 1278, p35: 1125, p42: 1017, p50: 896 } },
+    "60Z7": { name: "SKIN 極緻防皺保養組合(中性至乾性)(含禮袋)", pv: 251.95, prices: { suggested: 14715, p25: 11322, p35: 9966, p42: 9015, p50: 7931 } },
+    "60Z8": { name: "SKIN 極緻防皺保養組合(中性至油性)(含禮袋)", pv: 251.95, prices: { suggested: 14715, p25: 11322, p35: 9966, p42: 9015, p50: 7931 } },
+    "2563": { name: "蘆薈滋潤乳液", pv: 8.30, prices: { suggested: 501, p25: 385, p35: 339, p42: 307, p50: 270 } },
+    "2562": { name: "蘆薈護膚凝露", pv: 8.30, prices: { suggested: 501, p25: 385, p35: 339, p42: 307, p50: 270 } },
+    "2561": { name: "蘆薈滋潤沐浴精", pv: 8.30, prices: { suggested: 501, p25: 385, p35: 339, p42: 307, p50: 270 } },
+    "2564": { name: "蘆薈洗髮露", pv: 8.30, prices: { suggested: 509, p25: 392, p35: 345, p42: 312, p50: 275 } },
+    "111K": { name: "維他命面膜-保濕", pv: 9.50, prices: { suggested: 589, p25: 465, p35: 415, p42: 380, p50: 341 } },
+    "112K": { name: "維他命面膜-美白", pv: 16.80, prices: { suggested: 985, p25: 758, p35: 667, p42: 604, p50: 531 } }
+};
+
+// 初始化 25 列
+const tableBody = document.getElementById('main-table');
+for (let i = 1; i <= 25; i++) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td>${i}</td>
+        <td><input type="text" class="sku-input" oninput="fetchData(this)"></td>
+        <td class="name-cell">-</td>
+        <td><input type="number" class="price-input" value="0" oninput="calculateAll()"></td>
+        <td class="p-pv">0</td>
+        <td><input type="number" class="qty-input" min="0" oninput="calculateAll()"></td>
+        <td class="highlight s-price">$ 0</td>
+        <td class="highlight s-pv">0</td>
+    `;
+    tableBody.appendChild(tr);
+}
+
+function fetchData(input) {
+    const row = input.parentElement.parentElement;
+    const sku = input.value.trim().toUpperCase();
+    const product = productDB[sku];
+    const tier = document.getElementById('discount-tier').value;
+
+    if (product) {
+        row.querySelector('.name-cell').innerText = product.name;
+        row.querySelector('.p-pv').innerText = product.pv.toFixed(2);
+        row.querySelector('.price-input').value = product.prices[tier];
+    } else {
+        row.querySelector('.name-cell').innerText = sku ? "❌ 無此貨號" : "-";
+        row.querySelector('.p-pv').innerText = "0";
+        row.querySelector('.price-input').value = 0;
+    }
+    calculateAll();
+}
+
+function updateAllPricesByTier() {
+    const tier = document.getElementById('discount-tier').value;
+    const rows = document.querySelectorAll('#main-table tr');
+    
+    rows.forEach(row => {
+        const sku = row.querySelector('.sku-input').value.trim().toUpperCase();
+        const product = productDB[sku];
+        if (product) {
+            row.querySelector('.price-input').value = product.prices[tier];
+        }
+    });
+    calculateAll();
+}
+
+function calculateAll() {
+    let totalMoney = 0;
+    let totalPV = 0;
+
+    const rows = document.querySelectorAll('#main-table tr');
+    rows.forEach(row => {
+        const unitPrice = parseFloat(row.querySelector('.price-input').value) || 0;
+        const pv = parseFloat(row.querySelector('.p-pv').innerText) || 0;
+        const qty = parseInt(row.querySelector('.qty-input').value) || 0;
+
+        const subPrice = unitPrice * qty;
+        const subPV = parseFloat((pv * qty).toFixed(2));
+
+        row.querySelector('.s-price').innerText = "$ " + subPrice.toLocaleString();
+        row.querySelector('.s-pv').innerText = subPV.toFixed(2);
+
+        totalMoney += subPrice;
+        totalPV += subPV;
+    });
+
+    document.getElementById('final-money').innerText = totalMoney.toLocaleString();
+    document.getElementById('final-pv').innerText = totalPV.toFixed(2);
+}
+
+function resetForm() {
+    if (confirm("確定要重設整張訂單嗎？")) {
+        location.reload();
+    }
+}
+</script>
+</body>
+</html>
