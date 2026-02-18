@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>賀寶芙報價系統 (含數量版)</title>
+    <style>
+        :root {
+            --primary: #78c043;
+            --dark: #2c3e50;
+            --light: #f8f9fa;
+            --border: #dee2e6;
+            --vp-color: #e67e22;
+            --subtotal-color: #d35400;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--light);
+            margin: 0;
+            padding: 0;
+            color: var(--dark);
+            padding-bottom: 160px; /* 底部留白給總計 */
+        }
+
+        /* 頂部固定區 */
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 10px 15px;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .header-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .control-panel select {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: none;
+            font-size: 1rem;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        /* 容器 */
+        .container {
+            padding: 10px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        /* 電腦版表頭 (手機版隱藏) */
+        .row-header {
+            display: flex;
+            padding: 8px 5px;
+            font-weight: bold;
+            font-size: 0.85rem;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        
+        /* 欄位寬度 (Desktop) */
+        .col-idx { width: 5%; text-align: center; }
+        .col-sku { width: 10%; text-align: center; }
+        .col-name { width: 35%; padding-left: 5px; }
+        .col-price { width: 12%; text-align: right; }
+        .col-qty { width: 10%; text-align: center; }
+        .col-subtotal { width: 15%; text-align: right; }
+        .col-vp { width: 13%; text-align: right; padding-right: 5px; }
+
+        /* 輸入行樣式 */
+        .input-row {
+            background: white;
+            padding: 8px 5px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap; /* 允許換行 */
+        }
+
+        .input-row:focus-within {
+            box-shadow: 0 0 0 2px var(--primary);
+        }
+
+        .row-idx { width: 5%; text-align: center; color: #aaa; font-size: 0.8rem; }
+        
+        input.input-sku {
+            width: 10%;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 8px 2px;
+            text-align: center;
+            font-size: 1rem;
+            font-family: monospace;
+            background: #fdfdfd;
+            font-weight: bold;
+            color: var(--dark);
+        }
+        
+        .display-name {
+            width: 35%;
+            padding: 0 10px;
+            font-size: 0.95rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #333;
+        }
+
+        .display-price {
+            width: 12%;
+            text-align: right;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        input.input-qty {
+            width: 10%;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 8px 2px;
+            text-align: center;
+            font-size: 1rem;
+            font-weight: bold;
+            margin: 0 5px;
+        }
+
+        .display-subtotal {
+            width: 15%;
+            text-align: right;
+            font-weight: bold;
+            font-size: 1rem;
+            color: var(--subtotal-color);
+        }
+
+        .display-vp {
+            width: 13%;
+            text-align: right;
+            font-size: 0.85rem;
+            color: var(--vp-color);
+            padding-right: 5px;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: white;
+        }
+
+        /* 底部總計區 */
+        .footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: white;
+            padding: 15px;
+            box-shadow: 0 -4px 15px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+            z-index: 999;
+        }
+
+        .footer-left { display: flex; flex-direction: column; gap: 5px; }
+        .reset-btn {
+            background: #95a5a6;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+        .totals { text-align: right; }
+        .total-price { font-size: 1.5rem; font-weight: bold; color: var(--primary); line-height: 1.2; }
+        .total-vp { font-size: 0.95rem; color: var(--vp-color); font-weight: bold; margin-top: 3px; }
+
+        /* ============================
+           手機版 RWD 優化 (雙層排版)
+           ============================ */
+        @media (max-width: 600px) {
+            .row-header { display: none; } /* 手機隱藏表頭 */
+            
+            .input-row {
+                align-items: center;
+                padding: 10px;
+            }
+
+            .col-idx, .row-idx { display: none; } /* 隱藏序號 */
+
+            /* 第一行：貨號 + 品名 */
+            input.input-sku { width: 20%; margin-right: 10px; }
+            .display-name { width: 75%; padding: 0; font-size: 1rem; font-weight: 500; }
+            
+            /* 強制換行 */
+            .break-line {
+                width: 100%;
+                height: 8px;
+            }
+
+            /* 第二行：單價 x 數量 = 小計 (點數) */
+            .display-price { 
+                width: 25%; 
+                text-align: left; 
+                font-size: 0.85rem; 
+            }
+            .display-price::before { content: "$"; }
+
+            input.input-qty {
+                width: 15%;
+                margin: 0 10px;
+                background-color: #f0f9eb; /* 微綠色底凸顯輸入框 */
+                border-color: #c3e6cb;
+            }
+
+            .display-subtotal {
+                width: 30%;
+                text-align: right;
+                font-size: 1.1rem;
+            }
+
+            .display-vp {
+                width: 20%;
+                font-size: 0.8rem;
+                align-self: flex-end;
+                padding-bottom: 2px;
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="header-title">報價與點數計算系統</div>
+    <div class="control-panel">
+        <select id="discount-level" onchange="recalculateAll()">
+            <option value="retail">建議零售價 (100%)</option>
+            <option value="p25">直銷商 (25%折扣)</option>
+            <option value="p35">資深顧問 (35%折扣)</option>
+            <option value="p42">成功營造者 (42%折扣)</option>
+            <option value="p50">合格督導 (50%折扣)</option>
+        </select>
+    </div>
+</header>
+
+<div class="container">
+    <div class="row-header">
+        <div class="col-idx">#</div>
+        <div class="col-sku">貨號</div>
+        <div class="col-name">產品名稱</div>
+        <div class="col-price">單價</div>
+        <div class="col-qty">數量</div>
+        <div class="col-subtotal">小計</div>
+        <div class="col-vp">總點數</div>
+    </div>
+    <div id="rows-container"></div>
+</div>
+
+<div class="footer">
+    <div class="footer-left">
+        <button class="reset-btn" onclick="resetForm()">全部清空</button>
+    </div>
+    <div class="totals">
+        <div class="total-price" id="grand-total">$0</div>
+        <div class="total-vp" id="total-vp">總點數: 0.00</div>
+    </div>
+</div>
+
+<script>
+    // ==========================================
+    // 產品資料庫
+    // ==========================================
+    const products = [
+        {sku: '2770', name: '營養蛋白混合飲料-香草', vp: 22.4, retail: 1850, p25: 1424, p35: 1253, p42: 1134, p50: 998},
+        {sku: '2771', name: '營養蛋白混合飲料-巧克力', vp: 22.4, retail: 1850, p25: 1424, p35: 1253, p42: 1134, p50: 998},
+        {sku: '2772', name: '營養蛋白混合飲料-草莓', vp: 22.4, retail: 1850, p25: 1424, p35: 1253, p42: 1134, p50: 998},
+        {sku: '1207', name: '營養蛋白混合飲料-薄菏巧克力', vp: 22.4, retail: 1850, p25: 1424, p35: 1253, p42: 1134, p50: 998},
+        {sku: '2487', name: '營養蛋白混合飲料-拿鐵', vp: 22.4, retail: 1850, p25: 1424, p35: 1253, p42: 1134, p50: 998},
+        {sku: '0271', name: '營養蛋白混合飲料-巧餅', vp: 22.4, retail: 1850, p25: 1424, p35: 1253, p42: 1134, p50: 998},
+        {sku: '2335', name: '營養蛋白混合飲料-芒果', vp: 22.4, retail: 1850, p25: 1424, p35: 1253, p42: 1134, p50: 998},
+        {sku: '072K', name: '營養蛋白混合飲料-精選植物配方', vp: 23.3, retail: 2167, p25: 1667, p35: 1468, p42: 1328, p50: 1169},
+        {sku: '0367', name: '兒童營養蛋白混合飲料 - 香草', vp: 19.95, retail: 1594, p25: 1226, p35: 1079, p42: 977, p50: 859},
+        {sku: '0242', name: '優質蛋白粉', vp: 17.95, retail: 1433, p25: 1103, p35: 970, p42: 878, p50: 773},
+        {sku: '217K', name: '特級優質蛋白粉', vp: 28.9, retail: 2511, p25: 1956, p35: 1734, p42: 1579, p50: 1402},
+        {sku: '247K', name: '特級優質蛋白粉-精選植物配方', vp: 28.9, retail: 2804, p25: 2249, p35: 2027, p42: 1872, p50: 1695},
+        {sku: '3122', name: '草維錠', vp: 10.0, retail: 605, p25: 465, p35: 410, p42: 371, p50: 327},
+        {sku: '3272', name: '蔬果營養錠', vp: 39.95, retail: 2669, p25: 2054, p35: 1808, p42: 1636, p50: 1439},
+        {sku: '1463', name: 'CR7勁能飲', vp: 24.9, retail: 1811, p25: 1422, p35: 1266, p42: 1157, p50: 1032},
+        {sku: '1457', name: 'H24 運動營養飲-香草口味', vp: 41.6, retail: 3085, p25: 2374, p35: 2090, p42: 1890, p50: 1663},
+        {sku: '1459', name: 'H24賦活能量飲', vp: 54.75, retail: 3857, p25: 2967, p35: 2612, p42: 2363, p50: 2079},
+        {sku: '0260', name: '活力點心棒-檸檬', vp: 7.7, retail: 773, p25: 666, p35: 623, p42: 593, p50: 559},
+        {sku: '1502', name: '紫錐花強健飲-蜂蜜香橙', vp: 9.95, retail: 752, p25: 579, p35: 509, p42: 461, p50: 405},
+        {sku: '0022', name: '五味子活力錠', vp: 15.5, retail: 1139, p25: 877, p35: 772, p42: 698, p50: 614},
+        {sku: '3151', name: 'Liftoff 活力發泡錠 - 橘子', vp: 15.95, retail: 1031, p25: 794, p35: 698, p42: 631, p50: 555},
+        {sku: '3152', name: 'Liftoff 活力發泡錠 - 檸檬蘭姆', vp: 15.95, retail: 1031, p25: 794, p35: 698, p42: 631, p50: 555},
+        {sku: '044K', name: '舒活飲', vp: 37.65, retail: 2269, p25: 1746, p35: 1536, p42: 1390, p50: 1223},
+        {sku: '0106', name: '草本濃縮速溶茶飲 - 原味(102克)', vp: 34.95, retail: 2140, p25: 1646, p35: 1449, p42: 1311, p50: 1154},
+        {sku: '2121', name: '草本濃縮速溶茶飲 - 蜜薑(102克)', vp: 34.95, retail: 2140, p25: 1646, p35: 1449, p42: 1311, p50: 1154},
+        {sku: '0256', name: '草本濃縮速溶茶飲 - 覆盆子(50克)', vp: 19.95, retail: 1248, p25: 961, p35: 845, p42: 765, p50: 673},
+        {sku: '0102', name: '瓜拿那豆速溶茶飲(60克)', vp: 14.75, retail: 1024, p25: 788, p35: 693, p42: 627, p50: 552},
+        {sku: '1427', name: '綠茶飲 - 原味', vp: 28.25, retail: 1726, p25: 1328, p35: 1169, p42: 1057, p50: 930},
+        {sku: '1428', name: '綠茶飲 - 石榴口味', vp: 28.25, retail: 1726, p25: 1328, p35: 1169, p42: 1057, p50: 930},
+        {sku: '0210', name: '甲殼纖維素', vp: 24.05, retail: 1680, p25: 1293, p35: 1138, p42: 1030, p50: 906},
+        {sku: '0111', name: '細喜錠', vp: 15.75, retail: 810, p25: 623, p35: 548, p42: 496, p50: 437},
+        {sku: '0049', name: '享孅錠', vp: 34.2, retail: 2471, p25: 1902, p35: 1674, p42: 1514, p50: 1331},
+        {sku: '2864', name: '營養纖維粉 - 蘋果口味', vp: 22.95, retail: 1761, p25: 1356, p35: 1193, p42: 1079, p50: 949},
+        {sku: '2865', name: '營養纖維粉 - 原味', vp: 22.95, retail: 1761, p25: 1356, p35: 1193, p42: 1079, p50: 949},
+        {sku: '0006', name: '濃縮蘆薈汁-原味', vp: 24.95, retail: 1904, p25: 1465, p35: 1289, p42: 1167, p50: 1026},
+        {sku: '1065', name: '濃縮蘆薈汁-芒果口味', vp: 24.95, retail: 1904, p25: 1465, p35: 1289, p42: 1167, p50: 1026},
+        {sku: '1610', name: '濃縮蘆薈汁-葡萄口味', vp: 24.95, retail: 1904, p25: 1465, p35: 1289, p42: 1167, p50: 1026},
+        {sku: '1829', name: '賀寶芙益生菌', vp: 20.45, retail: 1511, p25: 1162, p35: 1024, p42: 926, p50: 815},
+        {sku: '0036', name: '夜寧新', vp: 89.95, retail: 6001, p25: 4618, p35: 4065, p42: 3677, p50: 3234},
+        {sku: '0065', name: '深海魚油膠囊', vp: 25.75, retail: 1948, p25: 1499, p35: 1320, p42: 1194, p50: 1050},
+        {sku: '0100', name: '南極磷蝦油膠囊', vp: 35.5, retail: 2473, p25: 1903, p35: 1675, p42: 1515, p50: 1332},
+        {sku: '0565', name: '複合優質鈣片', vp: 10.7, retail: 812, p25: 625, p35: 549, p42: 498, p50: 438},
+        {sku: '1000', name: '關捷寶營養錠', vp: 44.0, retail: 3314, p25: 2550, p35: 2245, p42: 2031, p50: 1786},
+        {sku: '0056', name: '膠原蛋白美妍飲', vp: 43.55, retail: 3168, p25: 2438, p35: 2145, p42: 1941, p50: 1707},
+        {sku: '0566', name: '當歸錠', vp: 13.3, retail: 940, p25: 723, p35: 636, p42: 576, p50: 507},
+        {sku: '0279', name: '複合莓菁華膠囊', vp: 13.95, retail: 1099, p25: 846, p35: 744, p42: 674, p50: 593},
+        {sku: '194K', name: '舒視錠', vp: 38.75, retail: 2672, p25: 2056, p35: 1810, p42: 1637, p50: 1441},
+        {sku: '145K', name: '優護飲', vp: 10.75, retail: 858, p25: 660, p35: 581, p42: 526, p50: 463},
+        {sku: '75Z8', name: '優質營養早餐組', vp: 63.3, retail: 5044, p25: 3882, p35: 3417, p42: 3090, p50: 2718},
+        {sku: '75Z9', name: '活力營養早餐組', vp: 62.1, retail: 4778, p25: 3676, p35: 3235, p42: 2927, p50: 2575},
+        {sku: '76Z0', name: '促進代謝早餐組', vp: 82.3, retail: 5894, p25: 4535, p35: 3991, p42: 3611, p50: 3176},
+        {sku: '76Z1', name: '體重管理組', vp: 83.1, retail: 5404, p25: 4159, p35: 3660, p42: 3312, p50: 2913},
+        {sku: '76Z8', name: '青春活力組-靈活', vp: 54.7, retail: 4125, p25: 3174, p35: 2794, p42: 2527, p50: 2224},
+        {sku: '76Z9', name: '青春活力組-消化', vp: 68.35, retail: 5175, p25: 3983, p35: 3505, p42: 3171, p50: 2790},
+        {sku: '77Z0', name: '青春活力組-美麗升級', vp: 90.8, retail: 6680, p25: 5141, p35: 4524, p42: 4093, p50: 3600},
+        {sku: '77Z1', name: '美食三法寶組', vp: 74.0, retail: 4960, p25: 3817, p35: 3359, p42: 3039, p50: 2673},
+        {sku: '77Z2', name: '青春活力組-清晰', vp: 92.65, retail: 6441, p25: 4956, p35: 4362, p42: 3946, p50: 3471},
+        {sku: '77Z3', name: '青春活力組-360度循環通暢', vp: 171.4, retail: 12082, p25: 9316, p35: 8208, p42: 7433, p50: 6548},
+        {sku: '011K', name: '金質冰咖啡-摩卡', vp: 25.75, retail: 1851, p25: 1425, p35: 1254, p42: 1134, p50: 998},
+        {sku: '012K', name: '金質冰咖啡-拿鐵', vp: 25.75, retail: 1851, p25: 1425, p35: 1254, p42: 1134, p50: 998},
+        {sku: '0267', name: '倍他營養燕麥飲', vp: 20.2, retail: 1661, p25: 1297, p35: 1151, p42: 1048, p50: 931},
+        {sku: '127K', name: '女士之選(大豆異黃酮錠)', vp: 20.0, retail: 1473, p25: 1134, p35: 998, p42: 903, p50: 794},
+        {sku: '291K', name: '益知新', vp: 53.6, retail: 3274, p25: 2519, p35: 2218, p42: 2007, p50: 1765},
+        {sku: '3T21', name: '營養蛋白混和飲料隨身包-香草', vp: 12.25, retail: 1051, p25: 817, p35: 723, p42: 657, p50: 583},
+        {sku: '3T22', name: '營養蛋白混和飲料隨身包-巧克力', vp: 12.25, retail: 1051, p25: 817, p35: 723, p42: 657, p50: 583},
+        {sku: '0765', name: 'SKIN 舒顏潔膚凝膠', vp: 0.0, retail: 981, p25: 755, p35: 665, p42: 601, p50: 529},
+        {sku: '0766', name: 'SKIN 煥顏潔膚凝膠', vp: 0.0, retail: 981, p25: 755, p35: 665, p42: 601, p50: 529},
+        {sku: '0767', name: 'SKIN 草本化妝水 50ml', vp: 0.0, retail: 743, p25: 572, p35: 503, p42: 456, p50: 401},
+        {sku: '0891', name: 'SKIN 草本化妝水 150ml', vp: 0.0, retail: 1863, p25: 1433, p35: 1261, p42: 1141, p50: 1004},
+        {sku: '0768', name: 'SKIN 防皺極緻精華霜', vp: 0.0, retail: 2205, p25: 1697, p35: 1493, p42: 1351, p50: 1189},
+        {sku: '0770', name: 'SKIN 緊緻眼膠', vp: 0.0, retail: 1542, p25: 1187, p35: 1045, p42: 945, p50: 832},
+        {sku: '0771', name: 'SKIN 保濕眼霜', vp: 0.0, retail: 1542, p25: 1187, p35: 1045, p42: 945, p50: 832},
+        {sku: '0772', name: 'SKIN 瞬采磨砂膏', vp: 0.0, retail: 768, p25: 591, p35: 520, p42: 470, p50: 414},
+        {sku: '0773', name: 'SKIN 深層淨化面膜', vp: 0.0, retail: 831, p25: 639, p35: 563, p42: 509, p50: 448},
+        {sku: '0769', name: 'SKIN 煥顏日間乳液', vp: 0.0, retail: 1661, p25: 1278, p35: 1125, p42: 1017, p50: 896},
+        {sku: '0774', name: 'SKIN 賦活晚霜', vp: 0.0, retail: 1661, p25: 1278, p35: 1125, p42: 1017, p50: 896},
+        {sku: '0899', name: 'SKIN 防曬乳液SPF30PA+++', vp: 0.0, retail: 1661, p25: 1278, p35: 1125, p42: 1017, p50: 896},
+        {sku: '60Z7', name: 'SKIN 極緻防皺保養組合(中性至乾性)(含禮袋)', vp: 0.0, retail: 14715, p25: 11322, p35: 9966, p42: 9015, p50: 7931},
+        {sku: '60Z8', name: 'SKIN 極緻防皺保養組合(中性至油性)(含禮袋)', vp: 0.0, retail: 14715, p25: 11322, p35: 9966, p42: 9015, p50: 7931},
+        {sku: '2563', name: '蘆薈滋潤乳液', vp: 0.0, retail: 501, p25: 385, p35: 339, p42: 307, p50: 270},
+        {sku: '2562', name: '蘆薈護膚凝露', vp: 0.0, retail: 501, p25: 385, p35: 339, p42: 307, p50: 270},
+        {sku: '2561', name: '蘆薈滋潤沐浴精', vp: 0.0, retail: 501, p25: 385, p35: 339, p42: 307, p50: 270},
+        {sku: '2564', name: '蘆薈洗髮露', vp: 0.0, retail: 509, p25: 392, p35: 345, p42: 312, p50: 275},
+        {sku: '111K', name: '維他命面膜-保濕', vp: 0.0, retail: 589, p25: 465, p35: 415, p42: 380, p50: 341},
+        {sku: '112K', name: '維他命面膜-美白', vp: 0.0, retail: 985, p25: 758, p35: 667, p42: 604, p50: 531},
+    ];
+
+    const skuMap = {};
+    products.forEach(p => {
+        skuMap[p.sku.trim()] = p;
+    });
+
+    // ==========================================
+    // 程式邏輯 (含數量計算)
+    // ==========================================
+    window.onload = function() {
+        const container = document.getElementById('rows-container');
+        for (let i = 1; i <= 25; i++) {
+            const row = document.createElement('div');
+            row.className = 'input-row';
+            row.innerHTML = `
+                <div class="row-idx">${i}</div>
+                
+                <input type="tel" class="input-sku" id="sku-${i}" placeholder="0000" oninput="updateRow(${i})">
+                
+                <div class="display-name" id="name-${i}">-</div>
+                
+                <div class="break-line" style="display:none"></div> <div class="display-price" id="price-${i}"></div>
+                
+                <input type="tel" class="input-qty" id="qty-${i}" value="" placeholder="1" oninput="updateRow(${i})">
+                
+                <div class="display-subtotal" id="subtotal-${i}">$0</div>
+                
+                <div class="display-vp" id="vp-${i}">-</div>
+
+                <input type="hidden" id="raw-subtotal-${i}" value="0">
+                <input type="hidden" id="raw-totalvp-${i}" value="0">
+            `;
+            container.appendChild(row);
+        }
+        
+        // 修正：手機版顯示強制換行
+        if (window.innerWidth <= 600) {
+            document.querySelectorAll('.break-line').forEach(el => el.style.display = 'block');
+        }
+    };
+
+    function updateRow(idx) {
+        let skuInput = document.getElementById(`sku-${idx}`).value.trim();
+        let qtyInput = document.getElementById(`qty-${idx}`).value.trim();
+        
+        const nameEl = document.getElementById(`name-${idx}`);
+        const priceEl = document.getElementById(`price-${idx}`);
+        const subtotalEl = document.getElementById(`subtotal-${idx}`);
+        const vpEl = document.getElementById(`vp-${idx}`);
+        
+        const rawSubtotalEl = document.getElementById(`raw-subtotal-${idx}`);
+        const rawTotalVpEl = document.getElementById(`raw-totalvp-${idx}`);
+        
+        const discountLevel = document.getElementById('discount-level').value;
+
+        let product = null;
+
+        // 1. 直接搜尋
+        if (skuMap[skuInput]) {
+            product = skuMap[skuInput];
+        } 
+        // 2. 智慧補零
+        else if (skuInput.length > 0 && skuInput.length < 4 && !isNaN(skuInput)) {
+            const paddedSku = skuInput.padStart(4, '0');
+            if (skuMap[paddedSku]) {
+                product = skuMap[paddedSku];
+            }
+        }
+
+        if (skuInput === "") {
+            // 清空狀態
+            nameEl.innerText = "-";
+            priceEl.innerText = "";
+            subtotalEl.innerText = "$0";
+            vpEl.innerText = "-";
+            rawSubtotalEl.value = 0;
+            rawTotalVpEl.value = 0;
+            nameEl.style.color = "#333";
+        } else if (product) {
+            // 找到產品
+            nameEl.innerText = product.name;
+            nameEl.style.color = "var(--dark)";
+            
+            // 價格
+            const unitPrice = product[discountLevel] || product.retail;
+            priceEl.innerText = unitPrice.toLocaleString(); // 手機版用 CSS 加 $
+            
+            // 數量邏輯：如果沒填，預設為 1 進行計算 (但不自動填入框框，方便修改)
+            // 但如果輸入框是空的，我們在視覺上保持乾淨，計算時當作 1
+            // 若要強制預設：
+            let qty = parseInt(qtyInput);
+            if (isNaN(qty) || qty < 0) qty = 1; 
+
+            // 計算小計
+            const subtotal = unitPrice * qty;
+            const totalVp = (product.vp || 0) * qty;
+
+            subtotalEl.innerText = "$" + subtotal.toLocaleString();
+            
+            // 顯示點數 (總點數)
+            // 如果數量 > 1，顯示總點數比較合理
+            const displayVp = totalVp > 0 ? totalVp.toFixed(2).replace(/\.00$/, '') : "0";
+            vpEl.innerText = displayVp + " VP";
+            
+            // 存入隱藏欄位供總計使用
+            rawSubtotalEl.value = subtotal;
+            rawTotalVpEl.value = totalVp;
+
+        } else {
+            // 查無此號
+            nameEl.innerText = "查無此號";
+            nameEl.style.color = "red";
+            priceEl.innerText = "";
+            subtotalEl.innerText = "$0";
+            vpEl.innerText = "-";
+            rawSubtotalEl.value = 0;
+            rawTotalVpEl.value = 0;
+        }
+        
+        updateTotal();
+    }
+
+    function recalculateAll() {
+        for (let i = 1; i <= 25; i++) {
+            updateRow(i);
+        }
+    }
+
+    function updateTotal() {
+        let grandTotal = 0;
+        let grandTotalVp = 0;
+
+        for (let i = 1; i <= 25; i++) {
+            grandTotal += parseInt(document.getElementById(`raw-subtotal-${i}`).value) || 0;
+            grandTotalVp += parseFloat(document.getElementById(`raw-totalvp-${i}`).value) || 0;
+        }
+        
+        document.getElementById('grand-total').innerText = "$" + grandTotal.toLocaleString();
+        
+        // 總點數格式化
+        const formattedVp = Number.isInteger(grandTotalVp) ? grandTotalVp : grandTotalVp.toFixed(2);
+        document.getElementById('total-vp').innerText = "總點數: " + formattedVp;
+    }
+
+    function resetForm() {
+        if(!confirm("確定要清空所有內容嗎？")) return;
+        
+        for (let i = 1; i <= 25; i++) {
+            document.getElementById(`sku-${i}`).value = "";
+            document.getElementById(`qty-${i}`).value = "";
+            updateRow(i);
+        }
+    }
+</script>
+
+</body>
+</html>
